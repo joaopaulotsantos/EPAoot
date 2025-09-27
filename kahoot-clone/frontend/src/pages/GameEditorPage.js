@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import AddQuestionForm from '../components/AddQuestionForm'; // Importar o novo componente
+import AddQuestionForm from '../components/AddQuestionForm';
+import AIGenerationModal from '../components/AIGenerationModal';
 
 // Formulário de criação de jogo (componente interno)
 const CreateGameForm = ({ onGameCreated }) => {
@@ -50,6 +51,8 @@ const EditGamePanel = ({ gameId }) => {
   const [game, setGame] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [isSavingAiQuestions, setIsSavingAiQuestions] = useState(false);
 
   const fetchGame = async () => {
     try {
@@ -70,11 +73,46 @@ const EditGamePanel = ({ gameId }) => {
   }, [gameId]);
 
   const handleQuestionAdded = (newQuestion) => {
-    // Atualiza o estado para incluir a nova pergunta, forçando um re-render
     setGame(currentGame => ({
       ...currentGame,
       Questions: [...currentGame.Questions, newQuestion]
     }));
+  };
+
+  const handleAiQuestionsGenerated = async (generatedQuestions) => {
+    setIsSavingAiQuestions(true);
+    let currentQuestions = game.Questions;
+    try {
+      for (const q of generatedQuestions) {
+        const questionData = {
+          ...q,
+          gameId: gameId,
+          order: currentQuestions.length + 1,
+        };
+
+        const response = await fetch('http://localhost:3001/api/questions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(questionData),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Falha ao guardar a pergunta gerada: ${q.text}`);
+        }
+
+        const newQuestion = await response.json();
+        currentQuestions = [...currentQuestions, newQuestion];
+        setGame(currentGame => ({
+          ...currentGame,
+          Questions: currentQuestions
+        }));
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Ocorreu um erro ao guardar as perguntas geradas pela IA.');
+    } finally {
+      setIsSavingAiQuestions(false);
+    }
   };
 
   if (loading) return <p>A carregar dados do jogo...</p>;
@@ -83,22 +121,35 @@ const EditGamePanel = ({ gameId }) => {
 
   return (
     <div>
+      <AIGenerationModal
+        show={isAiModalOpen}
+        onClose={() => setIsAiModalOpen(false)}
+        onQuestionsGenerated={handleAiQuestionsGenerated}
+      />
       <h2>A editar: {game.title}</h2>
       <p>{game.description}</p>
       <hr />
       <h3>Perguntas</h3>
       {game.Questions && game.Questions.length > 0 ? (
-        <ul>
+        <ol>
           {game.Questions.map(q => <li key={q.id}>{q.text}</li>)}
-        </ul>
+        </ol>
       ) : (
         <p>Este jogo ainda não tem perguntas.</p>
       )}
-      <AddQuestionForm gameId={gameId} onQuestionAdded={handleQuestionAdded} />
+      {isSavingAiQuestions && <p>A guardar as perguntas geradas. Por favor, aguarde...</p>}
+      <div style={{ marginTop: '2rem', border: '1px solid #ccc', padding: '1rem', borderRadius: '5px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h4 style={{ margin: 0 }}>Adicionar Pergunta Manualmente</h4>
+          <button onClick={() => setIsAiModalOpen(true)} style={{ backgroundColor: '#46178f', color: 'white' }}>
+            ✨ Gerar com IA
+          </button>
+        </div>
+        <AddQuestionForm gameId={gameId} onQuestionAdded={handleQuestionAdded} />
+      </div>
     </div>
   );
 };
-
 
 // Componente principal da página
 const GameEditorPage = () => {
@@ -106,7 +157,6 @@ const GameEditorPage = () => {
   const navigate = useNavigate();
   const isEditing = Boolean(id);
 
-  // Função para redirecionar para a página de edição após a criação
   const handleGameCreated = (newGameId) => {
     navigate(`/game/edit/${newGameId}`);
   };

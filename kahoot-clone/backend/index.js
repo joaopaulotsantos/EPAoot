@@ -21,6 +21,7 @@ app.use(cors());
 app.use(express.json());
 app.use('/api/games', gameRoutes);
 app.use('/api/questions', questionRoutes);
+app.use('/api/ai', require('./routes/ai')); // Adicionar a nova rota de IA
 
 app.get('/', (req, res) => {
   res.send('<h1>API do Kahoot Clone a funcionar!</h1>');

@@ -13,6 +13,7 @@
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.18.2",
+    "openai": "^4.10.0",
     "sequelize": "^6.32.1",
     "socket.io": "^4.7.2",
     "tedious": "^16.4.0"
